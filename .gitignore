@@ -1,17 +1,19 @@
-# Node
-node_modules/
-npm-debug.log
-.env
+# Backend
+hr-backend/node_modules/
+hr-backend/.env
 
-# Flutter
-**/build/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-android/.gradle/
-android/app/build/
-ios/Pods/
-ios/.symlinks/
+# Flutter frontend
+hr_management/build/
+hr_management/.dart_tool/
+hr_management/.packages
+hr_management/.flutter-plugins
+hr_management/.flutter-plugins-dependencies
+hr_management/pubspec.lock
+
+# IDE & OS files
+*.iml
+*.log
+*.lock
+.idea/
+.vscode/
+.DS_Store

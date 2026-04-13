@@ -5,92 +5,70 @@ import '../config/api_config.dart';
 import '../models/employee.dart';
 
 class AuthService {
-  final _storage = const FlutterSecureStorage();
-  final String _tokenKey = 'auth_token';
+  static const _storage = FlutterSecureStorage();
 
-  // Login
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       final response = await http.post(
         Uri.parse(ApiConfig.login),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'email': email,
-          'password': password,
-        }),
+        body: json.encode({'email': email, 'password': password}),
       );
-
-      print('Login response status: ${response.statusCode}');
-      print('Login response body: ${response.body}');
-
+      final data = json.decode(response.body);
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        // Save token
-        await _storage.write(key: _tokenKey, value: data['token']);
-        
-        // Parse employee data
-        final employee = Employee.fromJson(data['employee']);
-        
-        return {
-          'success': true,
-          'employee': employee,
-          'message': data['message']
-        };
-      } else {
-        final error = json.decode(response.body);
-        return {
-          'success': false,
-          'error': error['error'] ?? 'Login failed'
-        };
+        await _storage.write(key: 'auth_token', value: data['token']);
+        return {'success': true, 'employee': Employee.fromJson(data['employee'])};
       }
-    } catch (e) {
-      print('Login error: $e');
-      return {
-        'success': false,
-        'error': 'Network error. Please check your connection and ensure backend is running.'
-      };
+      return {'success': false, 'error': data['error'] ?? 'Login failed'};
+    } catch (_) {
+      return {'success': false, 'error': 'Network error'};
     }
   }
 
-  // Get saved token
   Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
+    return _storage.read(key: 'auth_token');
   }
 
-  // Check if user is logged in
   Future<bool> isLoggedIn() async {
-    final token = await getToken();
-    return token != null;
+    final token = await _storage.read(key: 'auth_token');
+    return token != null && token.isNotEmpty;
   }
 
-  // Get current user info
   Future<Employee?> getCurrentUser() async {
     try {
-      final token = await getToken();
+      final token = await _storage.read(key: 'auth_token');
       if (token == null) return null;
-
       final response = await http.get(
         Uri.parse(ApiConfig.getCurrentUser),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
-
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return Employee.fromJson(data);
+        return Employee.fromJson(json.decode(response.body));
       }
       return null;
-    } catch (e) {
-      print('Get current user error: $e');
+    } catch (_) {
       return null;
     }
   }
 
-  // Logout
+  Future<List<Map<String, dynamic>>> getAllEmployees() async {
+    try {
+      final token = await _storage.read(key: 'auth_token');
+      final response = await http.get(
+        Uri.parse(ApiConfig.allEmployees),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data['data'] ?? data);
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> logout() async {
-    await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: 'auth_token');
   }
 }

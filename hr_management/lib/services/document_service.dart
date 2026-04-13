@@ -20,7 +20,6 @@ class DocumentService {
     try {
       String url = ApiConfig.myDocuments;
       if (documentType != null) url += '?document_type=$documentType';
-
       final response = await http.get(Uri.parse(url), headers: await _headers());
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -40,21 +39,37 @@ class DocumentService {
   }) async {
     try {
       final token = await _authService.getToken();
-      final request = http.MultipartRequest('POST', Uri.parse(ApiConfig.uploadDocument));
 
+      if (!await file.exists()) {
+        return {'success': false, 'error': 'File not found. Please pick the file again.'};
+      }
+
+      final fileSize = await file.length();
+      if (fileSize > 10 * 1024 * 1024) {
+        return {'success': false, 'error': 'File too large. Max 10MB allowed.'};
+      }
+
+      final request = http.MultipartRequest('POST', Uri.parse(ApiConfig.uploadDocument));
       request.headers['Authorization'] = 'Bearer $token';
       request.fields['document_type'] = documentType;
       request.fields['document_name'] = documentName;
       if (employeeId != null) request.fields['employee_id'] = employeeId.toString();
 
-      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+      final fileName = file.path.split('/').last.split('\\').last;
+      request.files.add(
+        await http.MultipartFile.fromPath('file', file.path, filename: fileName),
+      );
 
-      final streamedResponse = await request.send();
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Upload timed out.'),
+      );
+
       final response = await http.Response.fromStream(streamedResponse);
       final data = json.decode(response.body);
       return {'success': response.statusCode == 201, ...data};
     } catch (e) {
-      return {'success': false, 'error': 'Upload failed: $e'};
+      return {'success': false, 'error': e.toString()};
     }
   }
 
@@ -78,7 +93,6 @@ class DocumentService {
       if (employeeId != null) params.add('employee_id=$employeeId');
       if (documentType != null) params.add('document_type=$documentType');
       if (params.isNotEmpty) url += '?${params.join('&')}';
-
       final response = await http.get(Uri.parse(url), headers: await _headers());
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

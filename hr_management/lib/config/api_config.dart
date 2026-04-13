@@ -1,16 +1,22 @@
 class ApiConfig {
-  static const String baseUrl = 'http://192.168.0.108:3000/api';
+  static const String baseUrl = 'http://192.168.137.1:3000/api';
 
   // Auth
   static const String login = '$baseUrl/auth/login';
   static const String register = '$baseUrl/auth/register';
   static const String getCurrentUser = '$baseUrl/auth/me';
+  static const String allEmployees = '$baseUrl/auth/employees';
 
   // Leave
   static const String applyLeave = '$baseUrl/leave/request';
   static const String myLeaveRequests = '$baseUrl/leave/my-requests';
   static const String leaveBalance = '$baseUrl/leave/my-balance';
   static const String pendingApprovals = '$baseUrl/leave/pending';
+  static const String leaveTypes = '$baseUrl/leave/types';
+  static const String leaveTypesAll = '$baseUrl/leave/types/all';
+  static String leaveTypeById(int id) => '$baseUrl/leave/types/$id';
+  static String approveLeave(int id) => '$baseUrl/leave/$id/approve';
+  static String rejectLeave(int id) => '$baseUrl/leave/$id/reject';
 
   // Attendance
   static const String clockIn = '$baseUrl/attendance/clock-in';
@@ -19,6 +25,10 @@ class ApiConfig {
   static const String monthlyAttendance = '$baseUrl/attendance/monthly';
   static const String attendanceSummary = '$baseUrl/attendance/summary';
   static const String teamAttendance = '$baseUrl/attendance/team';
+  static const String allEmployeesToday = '$baseUrl/attendance/all-today';
+  static const String monthlyAttendanceAdmin = '$baseUrl/attendance/monthly-admin';
+  static const String myDevices = '$baseUrl/attendance/my-devices';
+  static String removeDevice(int id) => '$baseUrl/attendance/devices/$id';
 
   // Payroll
   static const String myPayslips = '$baseUrl/payroll/my-payslips';
@@ -49,4 +59,44 @@ class ApiConfig {
   static const String announcements = '$baseUrl/announcements/';
   static const String announcementRecentCount = '$baseUrl/announcements/recent-count';
   static String announcementById(int id) => '$baseUrl/announcements/$id';
+
+  // Notifications
+  static const String notifications = '$baseUrl/notifications';
+  static const String notificationsUnreadCount = '$baseUrl/notifications/unread-count';
+  static const String notificationsReadAll = '$baseUrl/notifications/read-all';
+  static String notificationMarkRead(int id) => '$baseUrl/notifications/$id/read';
+
+  // Departments
+  static const String departments = '$baseUrl/departments';
+  static String departmentById(int id) => '$baseUrl/departments/$id';
+
+  // Job Roles
+  static const String jobRoles = '$baseUrl/job-roles';
+  static String jobRoleById(int id) => '$baseUrl/job-roles/$id';
+  static const String assignEmployeeRole = '$baseUrl/job-roles/assign-employee';
+
+  // KPIs
+  static const String kpis = '$baseUrl/kpis';
+  static String kpiById(int id) => '$baseUrl/kpis/$id';
+  static String kpisForRole(int roleId) => '$baseUrl/kpis/role/$roleId';
+  static const String assignKPIToRoles = '$baseUrl/kpis/assign-roles';
+
+  // Evaluation Cycles
+  static const String evaluationCycles = '$baseUrl/evaluation-cycles';
+  static String evaluationCycleById(int id) => '$baseUrl/evaluation-cycles/$id';
+  static String initiateCycle(int cycleId) => '$baseUrl/evaluations/cycle/$cycleId/initiate';
+
+  // Evaluations
+  static const String myPendingEvaluations = '$baseUrl/evaluations/my-evaluations';
+  static String evaluationForm(int evaluationId) => '$baseUrl/evaluations/form/$evaluationId';
+  static String submitEvaluation(int evaluationId) => '$baseUrl/evaluations/submit/$evaluationId';
+  static String evaluationFeedback(int evaluationId) => '$baseUrl/evaluations/feedback/$evaluationId';
+  static const String assignPeerEvaluator = '$baseUrl/evaluations/assign-peer';
+  static String cycleEvaluationStatus(int cycleId) => '$baseUrl/evaluations/cycle-status/$cycleId';
+
+  // Performance Results
+  static String performanceResults(int cycleId) => '$baseUrl/evaluations/results/$cycleId';
+  static String myPerformanceResult(int cycleId) => '$baseUrl/evaluations/my-result/$cycleId';
+  static String developmentPlan(int cycleId, int employeeId) =>
+      '$baseUrl/evaluations/development/$cycleId/$employeeId';
 }

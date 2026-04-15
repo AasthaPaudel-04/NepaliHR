@@ -9,34 +9,37 @@ class NotificationService {
 
   Future<Map<String, String>> _headers() async {
     final token = await _authService.getToken();
-    return {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
   }
 
-  Future<Map<String, dynamic>> getNotifications() async {
+  Future<List<NotificationModel>> getNotifications() async {
     try {
-      final res = await http.get(Uri.parse(ApiConfig.notifications), headers: await _headers());
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-        return {
-          'success': true,
-          'data': (data['data'] as List).map((e) => NotificationModel.fromJson(e)).toList(),
-          'unread_count': data['unread_count'] ?? 0,
-        };
+      final response = await http.get(
+        Uri.parse(ApiConfig.notifications),
+        headers: await _headers(),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = data['data'] ?? data;
+        return (list as List).map((e) => NotificationModel.fromJson(e)).toList();
       }
-      return {'success': false, 'data': [], 'unread_count': 0};
+      return [];
     } catch (_) {
-      return {'success': false, 'data': [], 'unread_count': 0};
+      return [];
     }
   }
 
   Future<int> getUnreadCount() async {
     try {
-      final res = await http.get(
-        Uri.parse(ApiConfig.notificationsUnreadCount),
+      final response = await http.get(
+        Uri.parse(ApiConfig.notifUnreadCount),
         headers: await _headers(),
       );
-      if (res.statusCode == 200) {
-        return json.decode(res.body)['count'] ?? 0;
+      if (response.statusCode == 200) {
+        return json.decode(response.body)['count'] ?? 0;
       }
       return 0;
     } catch (_) {
@@ -44,15 +47,27 @@ class NotificationService {
     }
   }
 
-  Future<void> markRead(int id) async {
+  Future<bool> markRead(int id) async {
     try {
-      await http.put(Uri.parse(ApiConfig.notificationMarkRead(id)), headers: await _headers());
-    } catch (_) {}
+      final response = await http.put(
+        Uri.parse(ApiConfig.notifMarkRead(id)),
+        headers: await _headers(),
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
-  Future<void> markAllRead() async {
+  Future<bool> markAllRead() async {
     try {
-      await http.put(Uri.parse(ApiConfig.notificationsReadAll), headers: await _headers());
-    } catch (_) {}
+      final response = await http.put(
+        Uri.parse(ApiConfig.notifMarkAllRead),
+        headers: await _headers(),
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }

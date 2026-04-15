@@ -3,14 +3,18 @@ import 'package:intl/intl.dart';
 import '../../models/employee.dart';
 import '../../models/attendance.dart';
 import '../../services/attendance_service.dart';
-import '../../services/notification_service.dart';
+import '../../services/announcement_service.dart';
+import '../../services/notification_service.dart';         
 import '../../app_colors.dart';
+import '../../l10n/app_localizations.dart';                 
+import '../../widgets/language_switcher.dart';              
 import '../leave/apply_leave_screen.dart';
 import '../leave/pending_approvals_screen.dart';
 import '../leave/leave_type_management_screen.dart';
 import '../shift/shift_screen.dart';
 import '../documents/document_screen.dart';
 import '../announcements/announcement_screen.dart';
+import '../notifications/notifications_screen.dart';        
 import '../profile/profile_screen.dart';
 import '../performance/add_employee_screen.dart';
 import '../performance/department_screen.dart';
@@ -19,7 +23,6 @@ import '../performance/kpi_screen.dart';
 import '../performance/evaluation_cycle_screen.dart';
 import '../performance/my_evaluations_screen.dart';
 import '../performance/performance_results_screen.dart';
-import '../notifications/notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Employee employee;
@@ -30,25 +33,24 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final AttendanceService _attendanceService = AttendanceService();
-  final NotificationService _notificationService = NotificationService();
+  final AttendanceService   _attendanceService   = AttendanceService();
+  final AnnouncementService _announcementService = AnnouncementService();
+  final NotificationService _notifService        = NotificationService(); 
 
   Attendance? todayAttendance;
   Map<String, dynamic>? shiftInfo;
   bool isLoadingAttendance = true;
-  bool hasClocked = false;
-  bool isClockingIn = false;
-  int notificationCount = 0;
-
-  bool get isAdmin => widget.employee.role == 'admin';
-  bool get isManager => widget.employee.role == 'manager';
-  bool get isAdminOrManager => isAdmin || isManager;
+  bool hasClocked          = false;
+  bool isClockingIn        = false;
+  int  announcementCount   = 0;
+  int  _unreadNotifs       = 0; 
 
   @override
   void initState() {
     super.initState();
     _loadAttendanceData();
-    _loadNotificationCount();
+    _loadAnnouncementCount();
+    _loadUnreadNotifs(); 
   }
 
   Future<void> _loadAttendanceData() async {
@@ -58,21 +60,26 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           if (data['success']) {
-            hasClocked = data['hasClocked'];
+            hasClocked      = data['hasClocked'];
             todayAttendance = data['attendance'];
-            shiftInfo = data['shift'];
+            shiftInfo       = data['shift'];
           }
           isLoadingAttendance = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => isLoadingAttendance = false);
     }
   }
 
-  Future<void> _loadNotificationCount() async {
-    final count = await _notificationService.getUnreadCount();
-    if (mounted) setState(() => notificationCount = count);
+  Future<void> _loadAnnouncementCount() async {
+    final count = await _announcementService.getRecentCount();
+    if (mounted) setState(() => announcementCount = count);
+  }
+
+  Future<void> _loadUnreadNotifs() async {
+    final count = await _notifService.getUnreadCount();
+    if (mounted) setState(() => _unreadNotifs = count);
   }
 
   Future<void> _handleClockIn() async {
@@ -107,6 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get isAdmin =>
+      widget.employee.role == 'admin' || widget.employee.role == 'manager';
+
+  // ── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,7 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppColors.primary,
         onRefresh: () async {
           await _loadAttendanceData();
-          await _loadNotificationCount();
+          await _loadAnnouncementCount();
+          await _loadUnreadNotifs(); 
         },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -129,10 +141,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildClockInOutCard(),
                     const SizedBox(height: 24),
-                    _buildQuickActionsGrid(),
+                    _buildQuickActions(),
                     const SizedBox(height: 24),
                     _buildShortcutsSection(),
-                    const SizedBox(height: 80),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -143,80 +155,103 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildHeader() {
+    final l = AppLocalizations.of(context);
+
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.headerGradient),
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 28),
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_greeting(),
-                style: const TextStyle(
-                    color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w400)),
+            Text(
+              _greeting(l), 
+              style: const TextStyle(
+                  color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w400),
+            ),
             const SizedBox(height: 2),
             Text(
               widget.employee.fullName,
               style: const TextStyle(
                   color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8)),
               child: Text(
-                '${widget.employee.position ?? ''} · ${widget.employee.role.toUpperCase()}',
+                '${widget.employee.position ?? ''} • ${widget.employee.role.toUpperCase()}',
                 style: const TextStyle(
                     color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ]),
         ),
         const SizedBox(width: 10),
-        // Notification bell
+
+        // ── CHANGE 1: Bell now goes to NotificationsScreen with real badge ──
         GestureDetector(
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-          ).then((_) => _loadNotificationCount()),
+          ).then((_) {
+            _loadUnreadNotifs();
+            _loadAnnouncementCount();
+          }),
           child: Stack(children: [
             Container(
-              width: 42, height: 42,
+              width: 44, height: 44,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 21),
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.notifications_rounded,
+                  color: Colors.white, size: 22),
             ),
-            if (notificationCount > 0)
+            // Real unread count badge
+            if (_unreadNotifs > 0)
               Positioned(
                 right: 6, top: 6,
                 child: Container(
-                  width: 9, height: 9,
+                  width: 16, height: 16,
                   decoration: const BoxDecoration(
                       color: AppColors.warning, shape: BoxShape.circle),
+                  child: Center(
+                    child: Text(
+                      _unreadNotifs > 9 ? '9+' : '$_unreadNotifs',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ),
               ),
           ]),
         ),
+
         const SizedBox(width: 8),
-        // Avatar
+
+        const LanguageSwitcher(compact: true),
+
+        const SizedBox(width: 8),
+
         GestureDetector(
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => ProfileScreen(employee: widget.employee)),
+            MaterialPageRoute(
+                builder: (_) => ProfileScreen(employee: widget.employee)),
           ),
           child: Container(
-            width: 42, height: 42,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                   colors: [AppColors.accent, Color(0xFF00A891)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(13),
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Center(
               child: Text(
@@ -231,11 +266,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _greeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning 👋';
-    if (hour < 17) return 'Good afternoon 👋';
-    return 'Good evening 👋';
+  String _greeting(AppLocalizations l) {
+    final h = DateTime.now().hour;
+    if (h < 12) return l.goodMorning;
+    if (h < 17) return l.goodAfternoon;
+    return l.goodEvening;
   }
 
   Widget _buildClockInOutCard() {
@@ -246,65 +281,62 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: const [
-            BoxShadow(color: Color(0x101B4FD8), blurRadius: 24, offset: Offset(0, 4))
+            BoxShadow(color: Color(0x101B4FD8), blurRadius: 24, offset: Offset(0, 4)),
           ],
         ),
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(20),
         child: isLoadingAttendance
             ? const Center(
                 child: Padding(
                 padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ))
+                child: CircularProgressIndicator(color: AppColors.primary)))
             : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(DateFormat('EEEE, d MMM').format(DateTime.now()),
-                          style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500)),
-                      const SizedBox(height: 2),
-                      Text(DateFormat('hh:mm a').format(DateTime.now()),
-                          style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -1)),
-                    ]),
-                  ),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      DateFormat('EEEE, d MMM').format(DateTime.now()),
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormat('hh:mm a').format(DateTime.now()),
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1),
+                    ),
+                  ]),
+                  const Spacer(),
                   if (shiftInfo != null)
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
                           color: AppColors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.schedule_rounded,
+                            size: 14, color: AppColors.primary),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${shiftInfo!['start_time']} -- ${shiftInfo!['end_time']}',
+                          style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600),
                         ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.schedule_rounded,
-                              size: 13, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              '${shiftInfo!['start_time']} - ${shiftInfo!['end_time']}',
-                              style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ]),
-                      ),
+                      ]),
                     ),
                 ]),
                 if (hasClocked && todayAttendance != null) ...[
                   const SizedBox(height: 14),
                   _buildAttendanceStatus(),
                 ],
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 _buildClockButton(),
               ]),
       ),
@@ -315,40 +347,44 @@ class _HomeScreenState extends State<HomeScreen> {
     String formatTime(String? timeStr) {
       if (timeStr == null) return '--';
       try {
-        // Parse and convert to local Nepal time
-        final dt = DateTime.parse(timeStr).toLocal();
-        return DateFormat('hh:mm a').format(dt);
+        final dt    = DateTime.parse(timeStr);
+        final local = dt.isUtc ? dt.toLocal() : dt;
+        return DateFormat('hh:mm a').format(local);
       } catch (_) {
         return timeStr.length >= 5 ? timeStr.substring(0, 5) : timeStr;
       }
     }
 
-    final checkIn = formatTime(todayAttendance!.checkInTime);
+    final checkIn  = formatTime(todayAttendance!.checkInTime);
     final checkOut = formatTime(todayAttendance!.checkOutTime);
+
     Color statusColor;
     switch (todayAttendance!.status) {
-      case 'Present': statusColor = AppColors.success; break;
-      case 'Late': statusColor = AppColors.warning; break;
-      case 'Half Day': statusColor = AppColors.primary; break;
-      case 'WFH': statusColor = const Color(0xFF8B5CF6); break;
-      default: statusColor = AppColors.textSecondary;
+      case 'Present':  statusColor = AppColors.success;           break;
+      case 'Late':     statusColor = AppColors.warning;           break;
+      case 'Half Day': statusColor = AppColors.primary;           break;
+      case 'WFH':      statusColor = const Color(0xFF8B5CF6);     break;
+      default:         statusColor = AppColors.textSecondary;
     }
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-          color: AppColors.background, borderRadius: BorderRadius.circular(12)),
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(12)),
       child: Row(children: [
         _timeColumn('Clock In', checkIn),
         const Spacer(),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(20),
+              color: statusColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20)),
+          child: Text(
+            todayAttendance!.status ?? '',
+            style: TextStyle(
+                color: statusColor, fontWeight: FontWeight.w700, fontSize: 12),
           ),
-          child: Text(todayAttendance!.status ?? '',
-              style: TextStyle(
-                  color: statusColor, fontWeight: FontWeight.w700, fontSize: 12)),
         ),
         const Spacer(),
         _timeColumn('Clock Out', checkOut, alignEnd: true),
@@ -379,19 +415,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildClockButton() {
     final isClockedIn = hasClocked && todayAttendance?.checkOutTime == null;
     final alreadyDone = hasClocked && todayAttendance?.checkOutTime != null;
-    Color bgColor = AppColors.success;
+
+    Color    bgColor = AppColors.success;
     if (isClockedIn) bgColor = AppColors.warning;
     if (alreadyDone) bgColor = AppColors.textSecondary;
-    String label = 'Clock In';
+
+    final l = AppLocalizations.of(context);
+    String label = l.clockIn;
     if (isClockingIn) label = 'Processing...';
-    if (isClockedIn) label = 'Clock Out';
-    if (alreadyDone) label = 'Completed for Today';
+    if (isClockedIn)  label = l.clockOut;
+    if (alreadyDone)  label = l.completedForToday;
+
     IconData icon = Icons.login_rounded;
     if (isClockedIn) icon = Icons.logout_rounded;
     if (alreadyDone) icon = Icons.check_circle_rounded;
 
     return SizedBox(
-      width: double.infinity, height: 48,
+      width: double.infinity,
+      height: 50,
       child: FilledButton.icon(
         style: FilledButton.styleFrom(
           backgroundColor: bgColor,
@@ -403,250 +444,227 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: isClockingIn
             ? const SizedBox(
                 width: 18, height: 18,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                child: CircularProgressIndicator(
+                    color: Colors.white, strokeWidth: 2))
             : Icon(icon, size: 20),
         label: Text(label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
       ),
     );
   }
 
-  // ── Role-based quick actions GRID
-  Widget _buildQuickActionsGrid() {
-    final List<_QuickAction> actions = _getQuickActions();
+  Widget _buildQuickActions() {
+    final l = AppLocalizations.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Quick Actions',
-          style: TextStyle(
+      Text(l.quickActions,  // ← localized
+          style: const TextStyle(
               fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
       const SizedBox(height: 12),
-      GridView.count(
-        crossAxisCount: 4,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.85,
-        children: actions.map(_buildGridItem).toList(),
-      ),
+      Row(children: [
+        _quickAction(
+          icon: Icons.event_rounded, label: l.applyLeave, // ← localized
+          color: AppColors.warning,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const ApplyLeaveScreen()))
+              .then((_) => _loadAttendanceData()),
+        ),
+        const SizedBox(width: 12),
+        _quickAction(
+          icon: Icons.campaign_rounded, label: l.announcements, // ← localized
+          color: AppColors.accent, badge: announcementCount,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  AnnouncementScreen(userRole: widget.employee.role)))
+              .then((_) => _loadAnnouncementCount()),
+        ),
+        const SizedBox(width: 12),
+        _quickAction(
+          icon: Icons.folder_rounded, label: l.myDocuments, // ← localized
+          color: const Color(0xFF8B5CF6),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  DocumentScreen(userRole: widget.employee.role))),
+        ),
+        const SizedBox(width: 12),
+        _quickAction(
+          icon: Icons.schedule_rounded, label: l.myShift, // ← localized
+          color: AppColors.primary,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  ShiftScreen(userRole: widget.employee.role))),
+        ),
+        _quickAction(
+          icon: Icons.assessment_rounded, label: l.evals, // ← localized
+          color: const Color(0xFF7C3AED),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
+        ),
+      ]),
     ]);
   }
 
-  List<_QuickAction> _getQuickActions() {
-    if (isAdmin) {
-      return [
-        _QuickAction(Icons.schedule_rounded, 'Edit Shifts', AppColors.primary,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => ShiftScreen(userRole: 'admin')))),
-        _QuickAction(Icons.assessment_rounded, 'Evals', const Color(0xFF7C3AED),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyEvaluationsScreen()))),
-        _QuickAction(Icons.campaign_rounded, 'Notices', AppColors.accent,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => AnnouncementScreen(userRole: 'admin')))),
-        _QuickAction(Icons.folder_rounded, 'Documents', const Color(0xFF8B5CF6),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentScreen(userRole: 'admin')))),
-      ];
-    } else if (isManager) {
-      return [
-        _QuickAction(Icons.event_rounded, 'Apply Leave', AppColors.warning,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplyLeaveScreen()))),
-        _QuickAction(Icons.campaign_rounded, 'Notices', AppColors.accent,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => AnnouncementScreen(userRole: 'manager')))),
-        _QuickAction(Icons.folder_rounded, 'Documents', const Color(0xFF8B5CF6),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentScreen(userRole: 'manager')))),
-        _QuickAction(Icons.schedule_rounded, 'My Shift', AppColors.primary,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => ShiftScreen(userRole: 'manager')))),
-        _QuickAction(Icons.assessment_rounded, 'Evals', const Color(0xFF7C3AED),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyEvaluationsScreen()))),
-        _QuickAction(Icons.approval_rounded, 'Approvals', AppColors.error,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PendingApprovalsScreen()))),
-      ];
-    } else {
-      // Employee
-      return [
-        _QuickAction(Icons.event_rounded, 'Apply Leave', AppColors.warning,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ApplyLeaveScreen()))),
-        _QuickAction(Icons.campaign_rounded, 'Notices', AppColors.accent,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => AnnouncementScreen(userRole: 'employee')))),
-        _QuickAction(Icons.folder_rounded, 'Documents', const Color(0xFF8B5CF6),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocumentScreen(userRole: 'employee')))),
-        _QuickAction(Icons.schedule_rounded, 'My Shift', AppColors.primary,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => ShiftScreen(userRole: 'employee')))),
-        _QuickAction(Icons.assessment_rounded, 'My Evals', const Color(0xFF7C3AED),
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyEvaluationsScreen()))),
-      ];
-    }
-  }
-
-  Widget _buildGridItem(_QuickAction action) {
-    return GestureDetector(
-      onTap: action.onTap,
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 56, height: 56,
-          decoration: BoxDecoration(
-            color: action.color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: action.color.withOpacity(0.2), width: 1),
-          ),
-          child: Icon(action.icon, color: action.color, size: 26),
-        ),
-        const SizedBox(height: 6),
-        Text(action.label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary)),
-      ]),
+  Widget _quickAction({
+    required IconData icon, required String label,
+    required Color color, required VoidCallback onTap, int badge = 0,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(children: [
+          Stack(clipBehavior: Clip.none, children: [
+            Container(
+              width: 56, height: 56,
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: color.withOpacity(0.2), width: 1)),
+              child: Icon(icon, color: color, size: 26),
+            ),
+            if (badge > 0)
+              Positioned(
+                right: -4, top: -4,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                      color: AppColors.error, shape: BoxShape.circle),
+                  child: Text(badge > 9 ? '9+' : '$badge',
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 9,
+                          fontWeight: FontWeight.w700)),
+                ),
+              ),
+          ]),
+          const SizedBox(height: 6),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary)),
+        ]),
+      ),
     );
   }
 
   Widget _buildShortcutsSection() {
+    final l = AppLocalizations.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('More',
           style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              fontSize: 15, fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary)),
       const SizedBox(height: 12),
-      // Common to all roles
       _shortcutTile(
-        icon: Icons.assessment_rounded,
-        label: 'My Evaluations',
-        subtitle: 'Pending evaluation tasks',
-        color: const Color(0xFF7C3AED),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
+        icon: Icons.approval_rounded, label: l.pendingApprovals,
+        subtitle: 'Review leave requests', color: AppColors.error,
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const PendingApprovalsScreen())),
       ),
-      // Admin-only
+      const SizedBox(height: 10),
+      _shortcutTile(
+        icon: Icons.assessment_rounded, label: l.myEvaluations,
+        subtitle: 'Pending evaluation tasks', color: const Color(0xFF7C3AED),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
+      ),
       if (isAdmin) ...[
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.person_add_rounded,
-          label: 'Add Employee',
-          subtitle: 'Register a new employee',
-          color: AppColors.success,
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
+          icon: Icons.person_add_rounded, label: l.addEmployee,
+          subtitle: 'Register a new employee', color: AppColors.success,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.business_rounded,
-          label: 'Departments',
+          icon: Icons.business_rounded, label: l.departments,
           subtitle: 'Manage company departments',
           color: const Color(0xFF0891B2),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const DepartmentScreen())),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const DepartmentScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.badge_rounded,
-          label: 'Job Roles',
+          icon: Icons.badge_rounded, label: l.jobRoles,
           subtitle: 'Manage roles & assign employees',
           color: const Color(0xFF7C3AED),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const JobRoleScreen())),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const JobRoleScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.track_changes_rounded,
-          label: 'KPI Management',
+          icon: Icons.track_changes_rounded, label: l.kpiManagement,
           subtitle: 'Create & assign KPIs to roles',
           color: const Color(0xFF059669),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const KpiScreen())),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const KpiScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.event_repeat_rounded,
-          label: 'Evaluation Cycles',
+          icon: Icons.event_repeat_rounded, label: l.evaluationCycles,
           subtitle: 'Create cycles & assign peers',
           color: const Color(0xFFD97706),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const EvaluationCycleScreen())),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const EvaluationCycleScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.leaderboard_rounded,
-          label: 'Performance Results',
+          icon: Icons.leaderboard_rounded, label: l.performanceResults,
           subtitle: 'View 360° scores & grades',
           color: const Color(0xFFDC2626),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const PerformanceResultsScreen())),
-        ),
-      ],
-      // Manager shortcuts
-      if (isManager) ...[
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.approval_rounded,
-          label: 'Pending Approvals',
-          subtitle: 'Review leave requests',
-          color: AppColors.error,
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const PendingApprovalsScreen())),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const PerformanceResultsScreen())),
         ),
         const SizedBox(height: 10),
         _shortcutTile(
-          icon: Icons.leaderboard_rounded,
-          label: 'Performance Results',
-          subtitle: 'View team evaluation results',
-          color: const Color(0xFFDC2626),
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const PerformanceResultsScreen())),
+          icon: Icons.event_note_rounded, label: l.leaveTypes,
+          subtitle: 'Edit leave categories & days',
+          color: const Color(0xFFD97706),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(
+                  builder: (_) => const LeaveTypeManagementScreen())),
         ),
       ],
     ]);
   }
 
   Widget _shortcutTile({
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
+    required IconData icon, required String label,
+    required String subtitle, required Color color, required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border, width: 1),
           boxShadow: const [
-            BoxShadow(color: Color(0x081B4FD8), blurRadius: 12, offset: Offset(0, 2))
+            BoxShadow(color: Color(0x081B4FD8), blurRadius: 12, offset: Offset(0, 2)),
           ],
         ),
         child: Row(children: [
           Container(
             width: 44, height: 44,
             decoration: BoxDecoration(
-                color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary)),
-              Text(subtitle,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-            ]),
-          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary)),
+            Text(subtitle,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+          ]),
+          const Spacer(),
           const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
         ]),
       ),
     );
   }
-}
-
-class _QuickAction {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  _QuickAction(this.icon, this.label, this.color, this.onTap);
 }

@@ -1,4 +1,3 @@
-// lib/providers/language_provider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -8,16 +7,15 @@ class LanguageProvider extends ChangeNotifier {
 
   Locale _locale = const Locale('en');
   Locale get locale => _locale;
-
   bool get isNepali => _locale.languageCode == 'ne';
 
   LanguageProvider() {
-    _loadSaved();
+    _load();
   }
 
-  Future<void> _loadSaved() async {
+  Future<void> _load() async {
     final saved = await _storage.read(key: _key);
-    if (saved != null) {
+    if (saved != null && saved.isNotEmpty) {
       _locale = Locale(saved);
       notifyListeners();
     }
@@ -30,9 +28,7 @@ class LanguageProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleLanguage() async {
-    await setLocale(
-      _locale.languageCode == 'en' ? const Locale('ne') : const Locale('en'),
-    );
-  }
+  Future<void> toggle() => setLocale(
+    _locale.languageCode == 'en' ? const Locale('ne') : const Locale('en'),
+  );
 }

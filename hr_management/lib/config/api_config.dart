@@ -61,10 +61,10 @@ class ApiConfig {
   static String announcementById(int id) => '$baseUrl/announcements/$id';
 
   // Notifications
-  static const String notifications = '$baseUrl/notifications';
-  static const String notificationsUnreadCount = '$baseUrl/notifications/unread-count';
-  static const String notificationsReadAll = '$baseUrl/notifications/read-all';
-  static String notificationMarkRead(int id) => '$baseUrl/notifications/$id/read';
+  static const String notifications     = '$baseUrl/notifications';
+  static const String notifUnreadCount  = '$baseUrl/notifications/unread-count';
+  static const String notifMarkAllRead  = '$baseUrl/notifications/read-all';
+  static String notifMarkRead(int id)   => '$baseUrl/notifications/$id/read';
 
   // Departments
   static const String departments = '$baseUrl/departments';

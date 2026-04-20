@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../models/employee.dart';
 import '../../models/attendance.dart';
 import '../../services/attendance_service.dart';
 import '../../services/announcement_service.dart';
-import '../../services/notification_service.dart';         
+import '../../services/notification_service.dart';
 import '../../app_colors.dart';
-import '../../l10n/app_localizations.dart';                 
-import '../../widgets/language_switcher.dart';              
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_switcher.dart';
 import '../leave/apply_leave_screen.dart';
 import '../leave/pending_approvals_screen.dart';
 import '../leave/leave_type_management_screen.dart';
+import '../leave/leave_screen.dart';
 import '../shift/shift_screen.dart';
 import '../documents/document_screen.dart';
 import '../announcements/announcement_screen.dart';
-import '../notifications/notifications_screen.dart';        
+import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../performance/add_employee_screen.dart';
 import '../performance/department_screen.dart';
@@ -35,7 +37,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AttendanceService   _attendanceService   = AttendanceService();
   final AnnouncementService _announcementService = AnnouncementService();
-  final NotificationService _notifService        = NotificationService(); 
+  final NotificationService _notifService        = NotificationService();
 
   Attendance? todayAttendance;
   Map<String, dynamic>? shiftInfo;
@@ -43,14 +45,14 @@ class _HomeScreenState extends State<HomeScreen> {
   bool hasClocked          = false;
   bool isClockingIn        = false;
   int  announcementCount   = 0;
-  int  _unreadNotifs       = 0; 
+  int  _unreadNotifs       = 0;
 
   @override
   void initState() {
     super.initState();
     _loadAttendanceData();
     _loadAnnouncementCount();
-    _loadUnreadNotifs(); 
+    _loadUnreadNotifs();
   }
 
   Future<void> _loadAttendanceData() async {
@@ -118,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
       widget.employee.role == 'admin' || widget.employee.role == 'manager';
 
   // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onRefresh: () async {
           await _loadAttendanceData();
           await _loadAnnouncementCount();
-          await _loadUnreadNotifs(); 
+          await _loadUnreadNotifs();
         },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -141,10 +144,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildClockInOutCard(),
                     const SizedBox(height: 24),
-                    _buildQuickActions(),
-                    const SizedBox(height: 24),
-                    _buildShortcutsSection(),
-                    const SizedBox(height: 24),
+                    _buildLeaveSection(),
+                    const SizedBox(height: 16),
+                    _buildAttendanceSection(),
+                    const SizedBox(height: 16),
+                    if (isAdmin) _buildEmployeeManagementSection(),
+                    if (isAdmin) const SizedBox(height: 16),
+                    _buildEvaluationSection(),
+                    const SizedBox(height: 16),
+                    _buildMoreSection(),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -156,9 +165,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Header ─────────────────────────────────────────────────────────────────
+
   Widget _buildHeader() {
     final l = AppLocalizations.of(context);
-
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.headerGradient),
       padding: const EdgeInsets.fromLTRB(20, 56, 20, 28),
@@ -166,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(
-              _greeting(l), 
+              _greeting(l),
               style: const TextStyle(
                   color: Colors.white60, fontSize: 13, fontWeight: FontWeight.w400),
             ),
@@ -186,13 +195,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 '${widget.employee.position ?? ''} • ${widget.employee.role.toUpperCase()}',
                 style: const TextStyle(
                     color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ]),
         ),
         const SizedBox(width: 10),
-
-        // ── CHANGE 1: Bell now goes to NotificationsScreen with real badge ──
         GestureDetector(
           onTap: () => Navigator.push(
             context,
@@ -210,7 +218,6 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Icon(Icons.notifications_rounded,
                   color: Colors.white, size: 22),
             ),
-            // Real unread count badge
             if (_unreadNotifs > 0)
               Positioned(
                 right: 6, top: 6,
@@ -231,13 +238,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
           ]),
         ),
-
         const SizedBox(width: 8),
-
         const LanguageSwitcher(compact: true),
-
         const SizedBox(width: 8),
-
         GestureDetector(
           onTap: () => Navigator.push(
             context,
@@ -273,6 +276,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return l.goodEvening;
   }
 
+  // ── Clock In/Out Card ──────────────────────────────────────────────────────
+
   Widget _buildClockInOutCard() {
     return Transform.translate(
       offset: const Offset(0, -20),
@@ -291,45 +296,52 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.all(16),
                 child: CircularProgressIndicator(color: AppColors.primary)))
             : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(
-                      DateFormat('EEEE, d MMM').format(DateTime.now()),
-                      style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      DateFormat('hh:mm a').format(DateTime.now()),
-                      style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1),
-                    ),
-                  ]),
-                  const Spacer(),
+                // FIX: Use flexible layout to prevent right overflow
+                Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        DateFormat('EEEE, d MMM').format(DateTime.now()),
+                        style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat('hh:mm a').format(DateTime.now()),
+                        style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1),
+                      ),
+                    ]),
+                  ),
                   if (shiftInfo != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.schedule_rounded,
-                            size: 14, color: AppColors.primary),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${shiftInfo!['start_time']} -- ${shiftInfo!['end_time']}',
-                          style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ]),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.schedule_rounded,
+                              size: 14, color: AppColors.primary),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              '${shiftInfo!['start_time']}–${shiftInfo!['end_time']}',
+                              style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ]),
+                      ),
                     ),
                 ]),
                 if (hasClocked && todayAttendance != null) ...[
@@ -453,78 +465,82 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
-    final l = AppLocalizations.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(l.quickActions,  // ← localized
-          style: const TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-      const SizedBox(height: 12),
-      Row(children: [
-        _quickAction(
-          icon: Icons.event_rounded, label: l.applyLeave, // ← localized
-          color: AppColors.warning,
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const ApplyLeaveScreen()))
-              .then((_) => _loadAttendanceData()),
+  // ── Section Header ─────────────────────────────────────────────────────────
+
+  Widget _sectionHeader(String title, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 16, color: color),
         ),
-        const SizedBox(width: 12),
-        _quickAction(
-          icon: Icons.campaign_rounded, label: l.announcements, // ← localized
-          color: AppColors.accent, badge: announcementCount,
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) =>
-                  AnnouncementScreen(userRole: widget.employee.role)))
-              .then((_) => _loadAnnouncementCount()),
-        ),
-        const SizedBox(width: 12),
-        _quickAction(
-          icon: Icons.folder_rounded, label: l.myDocuments, // ← localized
-          color: const Color(0xFF8B5CF6),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) =>
-                  DocumentScreen(userRole: widget.employee.role))),
-        ),
-        const SizedBox(width: 12),
-        _quickAction(
-          icon: Icons.schedule_rounded, label: l.myShift, // ← localized
-          color: AppColors.primary,
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) =>
-                  ShiftScreen(userRole: widget.employee.role))),
-        ),
-        _quickAction(
-          icon: Icons.assessment_rounded, label: l.evals, // ← localized
-          color: const Color(0xFF7C3AED),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
-        ),
+        const SizedBox(width: 10),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary)),
       ]),
-    ]);
+    );
   }
 
-  Widget _quickAction({
-    required IconData icon, required String label,
-    required Color color, required VoidCallback onTap, int badge = 0,
+  Widget _sectionCard({required List<Widget> tiles}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(color: Color(0x081B4FD8), blurRadius: 12, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        children: tiles.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final tile = entry.value;
+          return Column(
+            children: [
+              tile,
+              if (idx < tiles.length - 1)
+                const Divider(height: 1, indent: 56, endIndent: 16),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _sectionTile({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+    int badge = 0,
   }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(children: [
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(children: [
           Stack(clipBehavior: Clip.none, children: [
             Container(
-              width: 56, height: 56,
+              width: 40, height: 40,
               decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: color.withOpacity(0.2), width: 1)),
-              child: Icon(icon, color: color, size: 26),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: color, size: 20),
             ),
             if (badge > 0)
               Positioned(
                 right: -4, top: -4,
                 child: Container(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(3),
                   decoration: const BoxDecoration(
                       color: AppColors.error, shape: BoxShape.circle),
                   child: Text(badge > 9 ? '9+' : '$badge',
@@ -534,137 +550,208 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
           ]),
-          const SizedBox(height: 6),
-          Text(label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textSecondary, size: 20),
         ]),
       ),
     );
   }
 
-  Widget _buildShortcutsSection() {
+  // ── Leave Section ──────────────────────────────────────────────────────────
+
+  Widget _buildLeaveSection() {
     final l = AppLocalizations.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('More',
-          style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary)),
-      const SizedBox(height: 12),
-      _shortcutTile(
-        icon: Icons.approval_rounded, label: l.pendingApprovals,
-        subtitle: 'Review leave requests', color: AppColors.error,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const PendingApprovalsScreen())),
-      ),
-      const SizedBox(height: 10),
-      _shortcutTile(
-        icon: Icons.assessment_rounded, label: l.myEvaluations,
-        subtitle: 'Pending evaluation tasks', color: const Color(0xFF7C3AED),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
-      ),
-      if (isAdmin) ...[
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.person_add_rounded, label: l.addEmployee,
-          subtitle: 'Register a new employee', color: AppColors.success,
+      _sectionHeader('Leave', Icons.event_available_rounded, AppColors.warning),
+      _sectionCard(tiles: [
+        _sectionTile(
+          icon: Icons.add_circle_outline_rounded,
+          label: l.applyLeave,
+          subtitle: 'Submit a leave request',
+          color: AppColors.warning,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const ApplyLeaveScreen()))
+              .then((_) => _loadAttendanceData()),
+        ),
+        _sectionTile(
+          icon: Icons.list_alt_rounded,
+          label: 'My Leave Requests',
+          subtitle: 'View your leave history',
+          color: AppColors.primary,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const LeaveScreen())),
+        ),
+        if (isAdmin)
+          _sectionTile(
+            icon: Icons.approval_rounded,
+            label: l.pendingApprovals,
+            subtitle: 'Review and approve requests',
+            color: AppColors.error,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PendingApprovalsScreen())),
+          ),
+        if (isAdmin)
+          _sectionTile(
+            icon: Icons.category_rounded,
+            label: l.leaveTypes,
+            subtitle: 'Edit leave categories & days',
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const LeaveTypeManagementScreen())),
+          ),
+      ]),
+    ]);
+  }
+
+  // ── Attendance Section ─────────────────────────────────────────────────────
+
+  Widget _buildAttendanceSection() {
+    final l = AppLocalizations.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader('Attendance & Schedule', Icons.fingerprint_rounded, AppColors.primary),
+      _sectionCard(tiles: [
+        _sectionTile(
+          icon: Icons.schedule_rounded,
+          label: l.myShift,
+          subtitle: 'View your shift schedule',
+          color: AppColors.primary,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  ShiftScreen(userRole: widget.employee.role))),
+        ),
+        _sectionTile(
+          icon: Icons.campaign_rounded,
+          label: l.announcements,
+          subtitle: 'Company news & updates',
+          color: AppColors.accent,
+          badge: announcementCount,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  AnnouncementScreen(userRole: widget.employee.role)))
+              .then((_) => _loadAnnouncementCount()),
+        ),
+        _sectionTile(
+          icon: Icons.folder_rounded,
+          label: l.myDocuments,
+          subtitle: 'Your documents & files',
+          color: const Color(0xFF8B5CF6),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) =>
+                  DocumentScreen(userRole: widget.employee.role))),
+        ),
+      ]),
+    ]);
+  }
+
+  // ── Employee Management Section (admin/manager only) ───────────────────────
+
+  Widget _buildEmployeeManagementSection() {
+    final l = AppLocalizations.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader('Manage Employees', Icons.people_rounded, AppColors.success),
+      _sectionCard(tiles: [
+        _sectionTile(
+          icon: Icons.person_add_rounded,
+          label: l.addEmployee,
+          subtitle: 'Register a new employee',
+          color: AppColors.success,
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
         ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.business_rounded, label: l.departments,
+        _sectionTile(
+          icon: Icons.business_rounded,
+          label: l.departments,
           subtitle: 'Manage company departments',
           color: const Color(0xFF0891B2),
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const DepartmentScreen())),
         ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.badge_rounded, label: l.jobRoles,
+        _sectionTile(
+          icon: Icons.badge_rounded,
+          label: l.jobRoles,
           subtitle: 'Manage roles & assign employees',
           color: const Color(0xFF7C3AED),
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const JobRoleScreen())),
         ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.track_changes_rounded, label: l.kpiManagement,
-          subtitle: 'Create & assign KPIs to roles',
-          color: const Color(0xFF059669),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const KpiScreen())),
-        ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.event_repeat_rounded, label: l.evaluationCycles,
-          subtitle: 'Create cycles & assign peers',
-          color: const Color(0xFFD97706),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const EvaluationCycleScreen())),
-        ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.leaderboard_rounded, label: l.performanceResults,
-          subtitle: 'View 360° scores & grades',
-          color: const Color(0xFFDC2626),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const PerformanceResultsScreen())),
-        ),
-        const SizedBox(height: 10),
-        _shortcutTile(
-          icon: Icons.event_note_rounded, label: l.leaveTypes,
-          subtitle: 'Edit leave categories & days',
-          color: const Color(0xFFD97706),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(
-                  builder: (_) => const LeaveTypeManagementScreen())),
-        ),
-      ],
+      ]),
     ]);
   }
 
-  Widget _shortcutTile({
-    required IconData icon, required String label,
-    required String subtitle, required Color color, required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border, width: 1),
-          boxShadow: const [
-            BoxShadow(color: Color(0x081B4FD8), blurRadius: 12, offset: Offset(0, 2)),
-          ],
+  // ── Evaluation Section ─────────────────────────────────────────────────────
+
+  Widget _buildEvaluationSection() {
+    final l = AppLocalizations.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader('Evaluation & Performance', Icons.assessment_rounded, const Color(0xFF7C3AED)),
+      _sectionCard(tiles: [
+        _sectionTile(
+          icon: Icons.assignment_turned_in_rounded,
+          label: l.myEvaluations,
+          subtitle: 'Pending evaluation tasks',
+          color: const Color(0xFF7C3AED),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const MyEvaluationsScreen())),
         ),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: color, size: 22),
+        if (isAdmin) ...[
+          _sectionTile(
+            icon: Icons.track_changes_rounded,
+            label: l.kpiManagement,
+            subtitle: 'Create & assign KPIs to roles',
+            color: const Color(0xFF059669),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const KpiScreen())),
           ),
-          const SizedBox(width: 14),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary)),
-            Text(subtitle,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-          ]),
-          const Spacer(),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-        ]),
-      ),
-    );
+          _sectionTile(
+            icon: Icons.event_repeat_rounded,
+            label: l.evaluationCycles,
+            subtitle: 'Create cycles & assign peers',
+            color: const Color(0xFFD97706),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const EvaluationCycleScreen())),
+          ),
+          _sectionTile(
+            icon: Icons.leaderboard_rounded,
+            label: l.performanceResults,
+            subtitle: 'View 360° scores & grades',
+            color: const Color(0xFFDC2626),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PerformanceResultsScreen())),
+          ),
+        ],
+      ]),
+    ]);
+  }
+
+  // ── More Section ───────────────────────────────────────────────────────────
+
+  Widget _buildMoreSection() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader('Profile & Settings', Icons.settings_rounded, AppColors.textSecondary),
+      _sectionCard(tiles: [
+        _sectionTile(
+          icon: Icons.person_rounded,
+          label: 'My Profile',
+          subtitle: 'View and edit your profile',
+          color: AppColors.primary,
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(
+                  builder: (_) => ProfileScreen(employee: widget.employee))),
+        ),
+      ]),
+    ]);
   }
 }

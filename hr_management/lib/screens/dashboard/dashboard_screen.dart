@@ -1,7 +1,8 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;                    
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/attendance_service.dart';
@@ -10,6 +11,7 @@ import '../../services/payroll_service.dart';
 import '../../l10n/app_localizations.dart';
 
 // ── Bar chart painter ──────────────────────────────────────────────────────
+
 class _BarChartPainter extends CustomPainter {
   final List<_Bar> bars;
   final double maxVal;
@@ -23,7 +25,6 @@ class _BarChartPainter extends CustomPainter {
     final barW = (size.width - gap * (n + 1)) / n;
     final maxH = size.height - 24.0;
 
-    // Horizontal grid lines
     for (int i = 0; i <= 4; i++) {
       final y = maxH * (1 - i / 4);
       canvas.drawLine(
@@ -48,10 +49,10 @@ class _BarChartPainter extends CustomPainter {
             : [AppColors.primary.withOpacity(0.85),
                AppColors.primary.withOpacity(0.45)],
       );
+
       canvas.drawRRect(rect,
           Paint()..shader = grad.createShader(rect.outerRect));
 
-      // Value label on top of bar
       if (bar.value > 0) {
         final tp = TextPainter(
           text: TextSpan(
@@ -61,13 +62,12 @@ class _BarChartPainter extends CustomPainter {
                 fontWeight: FontWeight.w700,
                 color: bar.highlight ? AppColors.accent : AppColors.primary),
           ),
-          textDirection: ui.TextDirection.ltr,  // ← FIXED
+          textDirection: ui.TextDirection.ltr,
         )..layout();
         tp.paint(canvas,
             Offset(x + barW / 2 - tp.width / 2, y - tp.height - 2));
       }
 
-      // Day label below bar
       final lp = TextPainter(
         text: TextSpan(
           text: bar.label,
@@ -76,7 +76,7 @@ class _BarChartPainter extends CustomPainter {
               fontWeight: FontWeight.w600,
               color: AppColors.textSecondary),
         ),
-        textDirection: ui.TextDirection.ltr,    // ← FIXED
+        textDirection: ui.TextDirection.ltr,
       )..layout();
       lp.paint(canvas,
           Offset(x + barW / 2 - lp.width / 2, size.height - lp.height));
@@ -95,6 +95,7 @@ class _Bar {
 }
 
 // ── Donut painter ──────────────────────────────────────────────────────────
+
 class _DonutPainter extends CustomPainter {
   final List<_Slice> slices;
   _DonutPainter(this.slices);
@@ -132,6 +133,7 @@ class _Slice {
 }
 
 // ── Dashboard Screen ───────────────────────────────────────────────────────
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
   @override
@@ -239,7 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SliverToBoxAdapter(child: _buildChart(l)),
                   SliverToBoxAdapter(child: _buildBreakdown(l)),
                   SliverToBoxAdapter(child: _buildLeaveDonut(l)),
-                  SliverToBoxAdapter(child: _buildQuickActions(l)),
+                  // REMOVED: _buildQuickActions(l) — no longer shown in dashboard
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
@@ -248,6 +250,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Header ──────────────────────────────────────────────────────────────
+  // FIX: Header pills now use Flexible to prevent right overflow
+
   Widget _buildHeader(AppLocalizations l) {
     final now = DateTime.now();
     return Container(
@@ -282,42 +286,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ]),
         const SizedBox(height: 18),
+        // FIX: Use IntrinsicHeight + overflow-safe layout for pills row
         Row(children: [
-          _pill(Icons.people_rounded,          '$_totalEmp',     l.totalStaff),
-          const SizedBox(width: 10),
-          _pill(Icons.check_circle_rounded,    '$_present',      l.present),
-          const SizedBox(width: 10),
-          _pill(Icons.pending_actions_rounded, '$_pendingLeave', l.pendingApprovals),
+          Expanded(child: _pill(Icons.people_rounded,          '$_totalEmp',     l.totalStaff)),
+          const SizedBox(width: 8),
+          Expanded(child: _pill(Icons.check_circle_rounded,    '$_present',      l.present)),
+          const SizedBox(width: 8),
+          Expanded(child: _pill(Icons.pending_actions_rounded, '$_pendingLeave', l.pendingApprovals)),
         ]),
       ]),
     );
   }
 
-  Widget _pill(IconData icon, String val, String lbl) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-      decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.2))),
-      child: Row(children: [
-        Icon(icon, color: Colors.white70, size: 18),
-        const SizedBox(width: 7),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _pill(IconData icon, String val, String lbl) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+    decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2))),
+    child: Row(children: [
+      Icon(icon, color: Colors.white70, size: 16),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(val,
               style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                   height: 1.1)),
           Text(lbl,
-              style: const TextStyle(color: Colors.white54, fontSize: 10)),
+              style: const TextStyle(color: Colors.white54, fontSize: 9),
+              overflow: TextOverflow.ellipsis),
         ]),
-      ]),
-    ),
+      ),
+    ]),
   );
 
   // ── Metric cards ─────────────────────────────────────────────────────────
+
   Widget _buildMetrics(AppLocalizations l) {
     final total = _totalEmp > 0 ? _totalEmp : 1;
     final pct   = ((_present + _late) / total * 100).round();
@@ -397,6 +404,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Bar chart ─────────────────────────────────────────────────────────────
+
   Widget _buildChart(AppLocalizations l) {
     final maxV = _bars.isEmpty
         ? 10.0
@@ -452,6 +460,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Today breakdown ───────────────────────────────────────────────────────
+
   Widget _buildBreakdown(AppLocalizations l) {
     final total = _totalEmp > 0 ? _totalEmp : 1;
     final rows  = [
@@ -478,6 +487,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final color = r[2] as Color;
           final icon  = r[3] as IconData;
           final pct   = (count / total).clamp(0.0, 1.0);
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Column(
@@ -518,6 +528,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── Leave donut ───────────────────────────────────────────────────────────
+
   Widget _buildLeaveDonut(AppLocalizations l) {
     final total = (_casual + _sick + _annual).toDouble();
     final slices = total > 0
@@ -575,68 +586,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── Quick actions ─────────────────────────────────────────────────────────
-  Widget _buildQuickActions(AppLocalizations l) {
-    final actions = [
-      _QA(Icons.people_rounded,                l.addEmployee,        AppColors.primary),
-      _QA(Icons.account_balance_wallet_rounded, l.generatePayroll,   AppColors.success),
-      _QA(Icons.bar_chart_rounded,             l.performanceResults, const Color(0xFF8B5CF6)),
-      _QA(Icons.announcement_rounded,          l.createAnnouncement, AppColors.warning),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(l.quickActions,
-            style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 2.5,
-          children: actions
-              .map((a) => GestureDetector(
-                    onTap: () {},
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                          color: a.color.withOpacity(0.06),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                              color: a.color.withOpacity(0.2))),
-                      child: Row(children: [
-                        Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                              color: a.color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8)),
-                          child: Icon(a.icon, color: a.color, size: 16)),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(a.label,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: a.color),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 2)),
-                      ]),
-                    ),
-                  ))
-              .toList(),
-        ),
-      ]),
-    );
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────────
+
   Widget _card({required Widget child}) => Container(
     margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
     padding: const EdgeInsets.all(18),
@@ -681,6 +632,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // ── Data classes ──────────────────────────────────────────────────────────
+
 class _Metric {
   final IconData icon;
   final String label, value, sub;
@@ -688,11 +640,4 @@ class _Metric {
   final bool good;
   const _Metric(this.icon, this.label, this.value, this.sub, this.color,
       this.good);
-}
-
-class _QA {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _QA(this.icon, this.label, this.color);
 }

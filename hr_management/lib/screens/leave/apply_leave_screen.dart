@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'dart:convert';
+
 import '../../app_colors.dart';
 import '../../config/api_config.dart';
 import '../../services/auth_service.dart';
 import '../../services/leave_service.dart';
+import '../../widgets/dual_date_picker.dart';    // ← NEW
 
 class ApplyLeaveScreen extends StatefulWidget {
   const ApplyLeaveScreen({super.key});
-
   @override
   State<ApplyLeaveScreen> createState() => _ApplyLeaveScreenState();
 }
@@ -20,11 +21,10 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   final _authService  = AuthService();
   final _reasonController = TextEditingController();
 
-  // Leave types loaded from API
   List<Map<String, dynamic>> _leaveTypes = [];
   bool _loadingTypes = true;
+  String? _leaveType;
 
-  String? _leaveType;      // selected code e.g. 'sick'
   DateTime _startDate = DateTime.now();
   DateTime _endDate   = DateTime.now();
   bool _isLoading = false;
@@ -54,7 +54,6 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         });
       }
     } catch (_) {
-      // Fallback to hardcoded if API fails
       setState(() {
         _leaveTypes = [
           {'code': 'casual', 'name': 'Casual Leave',  'icon': 'beach_access'},
@@ -81,26 +80,6 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     }
   }
 
-  Future<void> _selectDate(bool isStart) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: isStart ? _startDate : _endDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      setState(() {
-        if (isStart) {
-          _startDate = picked;
-          if (_endDate.isBefore(_startDate)) _endDate = _startDate;
-        } else {
-          _endDate = picked;
-          if (_endDate.isBefore(_startDate)) _endDate = _startDate;
-        }
-      });
-    }
-  }
-
   Future<void> _submit() async {
     if (_leaveType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -109,6 +88,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       );
       return;
     }
+
     setState(() => _isLoading = true);
     final result = await _leaveService.applyLeave(
       leaveType: _leaveType!,
@@ -117,6 +97,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       reason:    _reasonController.text.trim().isEmpty
           ? null : _reasonController.text.trim(),
     );
+
     if (mounted) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -259,46 +240,34 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     );
   }
 
+  // ── Date card uses DualDateField instead of plain date pickers ────────────
+
   Widget _buildDateCard() {
     return _card(
       label: 'Duration',
-      child: Row(children: [
-        Expanded(child: _datePicker('Start Date', _startDate, true)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Container(height: 1, width: 20, color: AppColors.border),
+      child: Column(children: [
+        DualDateField(
+          label: 'Start Date',
+          date: _startDate,
+          firstDate: DateTime.now().subtract(const Duration(days: 1)),
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+          onChanged: (d) => setState(() {
+            _startDate = d;
+            if (_endDate.isBefore(_startDate)) _endDate = _startDate;
+          }),
         ),
-        Expanded(child: _datePicker('End Date', _endDate, false)),
+        const SizedBox(height: 10),
+        DualDateField(
+          label: 'End Date',
+          date: _endDate,
+          firstDate: _startDate,
+          lastDate: DateTime.now().add(const Duration(days: 365)),
+          onChanged: (d) => setState(() {
+            _endDate = d;
+            if (_endDate.isBefore(_startDate)) _endDate = _startDate;
+          }),
+        ),
       ]),
-    );
-  }
-
-  Widget _datePicker(String label, DateTime date, bool isStart) {
-    return GestureDetector(
-      onTap: () => _selectDate(isStart),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text(
-            DateFormat('dd MMM yyyy').format(date),
-            style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700),
-          ),
-        ]),
-      ),
     );
   }
 

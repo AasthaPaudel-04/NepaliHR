@@ -21,27 +21,42 @@ class NotificationModel {
 
   String get typeIcon {
     switch (type) {
-      case 'leave_request':   return '📋';
-      case 'leave_approved':  return '✅';
-      case 'leave_rejected':  return '❌';
-      case 'payslip_generated': return '💰';
-      case 'evaluation_assigned': return '📊';
+      case 'leave_request':        return '📋';
+      case 'leave_approved':       return '✅';
+      case 'leave_rejected':       return '❌';
+      case 'payslip_generated':    return '💰';
+      case 'evaluation_assigned':  return '📊';
       case 'evaluation_submitted': return '📝';
-      case 'development_plan': return '🎯';
-      case 'announcement':    return '📢';
-      default:                return '🔔';
+      case 'development_plan':     return '🎯';
+      case 'announcement':         return '📢';
+      default:                     return '🔔';
+    }
+  }
+
+  /// Human-readable category label used in the notification screen.
+  String get typeLabel {
+    switch (type) {
+      case 'leave_request':        return 'Leave Request';
+      case 'leave_approved':       return 'Leave Approved';
+      case 'leave_rejected':       return 'Leave Rejected';
+      case 'payslip_generated':    return 'Payslip';
+      case 'evaluation_assigned':  return 'Evaluation';
+      case 'evaluation_submitted': return 'Evaluation';
+      case 'development_plan':     return 'Development';
+      case 'announcement':         return 'Announcement';
+      default:                     return 'Notification';
     }
   }
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) =>
       NotificationModel(
-        id: json['id'],
-        type: json['type'] ?? '',
-        title: json['title'] ?? '',
-        body: json['body'] ?? '',
-        isRead: json['is_read'] ?? false,
-        createdAt: DateTime.parse(json['created_at']),
-        referenceId: json['reference_id'],
+        id:            json['id'],
+        type:          json['type'] ?? '',
+        title:         json['title'] ?? '',
+        body:          json['body'] ?? '',
+        isRead:        json['is_read'] ?? false,
+        createdAt:     DateTime.parse(json['created_at']),
+        referenceId:   json['reference_id'],
         referenceType: json['reference_type'],
       );
 }
